@@ -8,8 +8,8 @@ import {
   IconUserScan,
 } from "@tabler/icons-react";
 import { usePrivy } from "@privy-io/react-auth";
-import MetricsCard from "./MetricsCard"; // Adjust the import path
-import { useStateContext } from "../context"; // Ensure correct import path
+import MetricsCard from "./MetricsCard";
+import { useStateContext } from "../context";
 
 const DisplayInfo = () => {
   const navigate = useNavigate();
@@ -28,7 +28,6 @@ const DisplayInfo = () => {
     if (user) {
       fetchUserByEmail(user.email.address)
         .then(() => {
-          console.log(records);
           const totalFolders = records.length;
           let aiPersonalizedTreatment = 0;
           let totalScreenings = 0;
@@ -37,26 +36,35 @@ const DisplayInfo = () => {
           let overdueScreenings = 0;
 
           records.forEach((record) => {
-            if (record.kanbanRecords) {
+            if (record.kanbanRecords && record.kanbanRecords.trim() !== "") {
               try {
                 const kanban = JSON.parse(record.kanbanRecords);
-                aiPersonalizedTreatment += kanban.columns.some(
-                  (column) => column.title === "AI Personalized Treatment",
-                )
-                  ? 1
-                  : 0;
-                totalScreenings += kanban.tasks.length;
-                completedScreenings += kanban.tasks.filter(
-                  (task) => task.columnId === "done",
-                ).length;
-                pendingScreenings += kanban.tasks.filter(
-                  (task) => task.columnId === "doing",
-                ).length;
-                overdueScreenings += kanban.tasks.filter(
-                  (task) => task.columnId === "overdue",
-                ).length;
+                
+                // Count tasks in each column
+                if (kanban.tasks && Array.isArray(kanban.tasks)) {
+                  totalScreenings += kanban.tasks.length;
+                  
+                  kanban.tasks.forEach(task => {
+                    switch (task.columnId) {
+                      case "done":
+                        completedScreenings++;
+                        break;
+                      case "doing":
+                        pendingScreenings++;
+                        break;
+                      case "todo":
+                        overdueScreenings++;
+                        break;
+                    }
+                  });
+                }
+
+                // Check if this record has AI treatment
+                if (record.analysisResult && record.analysisResult.trim() !== "") {
+                  aiPersonalizedTreatment++;
+                }
               } catch (error) {
-                console.error("Failed to parse kanbanRecords:", error);
+                console.error("Failed to parse kanbanRecords for record:", record.id, error);
               }
             }
           });
@@ -71,10 +79,10 @@ const DisplayInfo = () => {
           });
         })
         .catch((e) => {
-          console.log(e);
+          console.error("Error fetching user data:", e);
         });
     }
-  }, [user, fetchUserRecords, records]);
+  }, [user, fetchUserRecords, records, fetchUserByEmail]);
 
   const metricsData = [
     {
@@ -82,50 +90,49 @@ const DisplayInfo = () => {
       subtitle: "View",
       value: metrics.pendingScreenings,
       icon: IconHourglassHigh,
-      onClick: () => navigate("/appointments/pending"),
+      onClick: () => navigate("/medical-records"),
     },
     {
       title: "Treatment Progress Update",
       subtitle: "View",
       value: `${metrics.completedScreenings} of ${metrics.totalScreenings}`,
       icon: IconCircleDashedCheck,
-
-      onClick: () => navigate("/treatment/progress"),
+      onClick: () => navigate("/screening-schedules"),
     },
     {
-      title: "Total Folders",
+      title: "Total Records",
       subtitle: "View",
       value: metrics.totalFolders,
       icon: IconFolder,
-      onClick: () => navigate("/folders"),
+      onClick: () => navigate("/medical-records"),
     },
     {
       title: "Total Screenings",
       subtitle: "View",
       value: metrics.totalScreenings,
       icon: IconUserScan,
-      onClick: () => navigate("/screenings"),
+      onClick: () => navigate("/screening-schedules"),
     },
     {
       title: "Completed Screenings",
       subtitle: "View",
       value: metrics.completedScreenings,
       icon: IconCircleDashedCheck,
-      onClick: () => navigate("/screenings/completed"),
+      onClick: () => navigate("/screening-schedules"),
     },
     {
       title: "Pending Screenings",
       subtitle: "View",
       value: metrics.pendingScreenings,
       icon: IconHourglassHigh,
-      onClick: () => navigate("/screenings/pending"),
+      onClick: () => navigate("/screening-schedules"),
     },
     {
-      title: "Overdue Screenings",
+      title: "Todo Screenings",
       subtitle: "View",
       value: metrics.overdueScreenings,
       icon: IconAlertCircle,
-      onClick: () => navigate("/screenings/overdue"),
+      onClick: () => navigate("/screening-schedules"),
     },
   ];
 

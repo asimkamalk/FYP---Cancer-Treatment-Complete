@@ -6,12 +6,13 @@ import { useStateContext } from "../context"; // Adjust the import path
 import { CustomButton } from ".";
 import { menu, search } from "../assets";
 import { navlinks } from "../constants";
-import { IconHeartHandshake } from "@tabler/icons-react";
+import { IconHeartHandshake, IconSearch } from "@tabler/icons-react";
 
 const Navbar = () => {
   const navigate = useNavigate();
   const [isActive, setIsActive] = useState("dashboard");
   const [toggleDrawer, setToggleDrawer] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
   const { ready, authenticated, login, user, logout } = usePrivy();
   const { fetchUsers, users, fetchUserRecords } = useStateContext();
 
@@ -37,6 +38,12 @@ const Navbar = () => {
     }
   }, [authenticated, user, fetchUserInfo]);
 
+  const handleSearch = useCallback((e) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    navigate("/medical-records", { state: { searchTerm: value } });
+  }, [navigate]);
+
   const handleLoginLogout = useCallback(() => {
     if (authenticated) {
       logout();
@@ -55,14 +62,12 @@ const Navbar = () => {
         <input
           type="text"
           placeholder="Search for records"
+          value={searchTerm}
+          onChange={handleSearch}
           className="flex w-full bg-transparent font-epilogue text-[14px] font-normal text-white outline-none placeholder:text-[#4b5264]"
         />
         <div className="flex h-full w-[72px] cursor-pointer items-center justify-center rounded-[20px] bg-[#4acd8d]">
-          <img
-            src={search}
-            alt="search"
-            className="h-[15px] w-[15px] object-contain"
-          />
+          <IconSearch className="h-[15px] w-[15px] text-white" />
         </div>
       </div>
 

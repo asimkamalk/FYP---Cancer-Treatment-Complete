@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -11,8 +11,13 @@ import { createPortal } from "react-dom";
 import ColumnContainer from "./ColumnContainer";
 import TaskCard from "./TaskCard";
 import { IconPlus } from "@tabler/icons-react";
+import { useStateContext } from "../context";
+import { useLocation } from "react-router-dom";
 
 function KanbanBoard({ state }) {
+  const location = useLocation();
+  const { records, updateRecord } = useStateContext();
+  
   const defaultCols =
     state?.state?.columns?.map((col) => ({
       id: col?.id,
@@ -35,6 +40,42 @@ function KanbanBoard({ state }) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 10 } }),
   );
+
+  // Save changes to database whenever tasks or columns change
+  useEffect(() => {
+    const saveChanges = async () => {
+      // Find the current record that matches this kanban board
+      const currentRecord = records.find(record => {
+        try {
+          const kanbanData = JSON.parse(record.kanbanRecords);
+          return (
+            JSON.stringify(kanbanData.columns) === JSON.stringify(defaultCols) &&
+            JSON.stringify(kanbanData.tasks) === JSON.stringify(defaultTasks)
+          );
+        } catch {
+          return false;
+        }
+      });
+
+      if (currentRecord) {
+        const updatedKanbanData = {
+          columns: columns,
+          tasks: tasks
+        };
+
+        await updateRecord({
+          documentID: currentRecord.id,
+          kanbanRecords: JSON.stringify(updatedKanbanData)
+        });
+      }
+    };
+
+    // Only save if we have made changes from the default state
+    if (JSON.stringify(tasks) !== JSON.stringify(defaultTasks) ||
+        JSON.stringify(columns) !== JSON.stringify(defaultCols)) {
+      saveChanges();
+    }
+  }, [tasks, columns, records, updateRecord, defaultTasks, defaultCols]);
 
   return (
     <div className="mt-5 min-h-screen w-72 text-white">

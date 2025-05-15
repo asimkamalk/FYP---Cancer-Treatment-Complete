@@ -49,7 +49,7 @@ const FileUploadModal = ({
           </label>
           or drag and drop here
         </div>
-        <small id="validFileFormats">PNG, PDF, JPEG - Max 5MB</small>
+        <small id="validFileFormats">JPEG, PNG, WebP, PDF - Max 5MB</small>
       </div>
       {uploading && (
         <IconProgress

@@ -55,45 +55,78 @@ function SingleRecordDetails() {
   };
 
   const handleFileUpload = async () => {
+    if (!file) {
+      alert("Please select a file first");
+      return;
+    }
+
+    console.log("Starting file upload...");
     setUploading(true);
     setUploadSuccess(false);
 
-    const genAI = new GoogleGenerativeAI(geminiApiKey);
-
     try {
-      const base64Data = await readFileAsBase64(file);
+      console.log("Initializing Gemini API...");
+      const genAI = new GoogleGenerativeAI(geminiApiKey);
+      console.log("API Key present:", !!geminiApiKey);
 
-      const imageParts = [
+      console.log("Reading file as base64...");
+      const base64Data = await readFileAsBase64(file);
+      console.log("File converted to base64");
+
+      // Check if file type is supported
+      const supportedTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+      if (!supportedTypes.includes(filetype)) {
+        throw new Error('Unsupported file type. Please upload a JPEG, PNG, WebP image, or PDF file.');
+      }
+
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      console.log("Model initialized");
+
+      const prompt = `You are an expert cancer and any disease diagnosis analyst. Use your knowledge base to answer questions about giving personalized recommended treatments.
+        Analyze the provided medical document and give a detailed treatment plan. Make it readable, clear and easy to understand in paragraphs.
+        Include:
+        1. Analysis of the medical document/image
+        2. Potential diagnosis
+        3. Recommended treatment steps
+        4. Follow-up care suggestions
+        5. Any additional relevant medical insights`;
+
+      const contentParts = [
+        prompt,
         {
           inlineData: {
             data: base64Data,
-            mimeType: filetype,
-          },
-        },
+            mimeType: filetype
+          }
+        }
       ];
 
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+      console.log("Sending request to Gemini...");
+      const result = await model.generateContent(contentParts);
+      console.log("Received response from Gemini");
 
-      const prompt = `You are an expert cancer and any disease diagnosis analyst. Use your knowledge base to answer questions about giving personalized recommended treatments.
-        give a detailed treatment plan for me, make it more readable, clear and easy to understand make it paragraphs to make it more readable
-        `;
-
-      const result = await model.generateContent([prompt, ...imageParts]);
       const response = await result.response;
       const text = response.text();
+      console.log("Generated text:", text.substring(0, 100) + "...");
+
       setAnalysisResult(text);
+      console.log("Updating record...");
+      
       const updatedRecord = await updateRecord({
         documentID: state.id,
         analysisResult: text,
         kanbanRecords: "",
       });
+      console.log("Record updated successfully");
+
       setUploadSuccess(true);
-      setIsModalOpen(false); // Close the modal after a successful upload
+      setIsModalOpen(false);
       setFilename("");
       setFile(null);
       setFileType("");
     } catch (error) {
-      console.error("Error uploading file:", error);
+      console.error("Error in handleFileUpload:", error);
+      alert("Error uploading file: " + error.message);
       setUploadSuccess(false);
     } finally {
       setUploading(false);
@@ -103,50 +136,81 @@ function SingleRecordDetails() {
   const processTreatmentPlan = async () => {
     setIsProcessing(true);
 
-    const genAI = new GoogleGenerativeAI(geminiApiKey);
+    try {
+      console.log("Starting treatment plan processing...");
+      const genAI = new GoogleGenerativeAI(geminiApiKey);
+      console.log("API Key present:", !!geminiApiKey);
 
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      console.log("Model initialized");
 
-    const prompt = `Your role and goal is to be an that will be using this treatment plan ${analysisResult} to create Columns:
-                - Todo: Tasks that need to be started
-                - Doing: Tasks that are in progress
-                - Done: Tasks that are completed
-          
-                Each task should include a brief description. The tasks should be categorized appropriately based on the stage of the treatment process.
-          
-                Please provide the results in the following  format for easy front-end display no quotating or what so ever just pure the structure below:
+      // Trim and clean the analysis result
+      const cleanedAnalysis = analysisResult.trim();
+      console.log("Analysis length:", cleanedAnalysis.length);
 
-                {
-                  "columns": [
-                    { "id": "todo", "title": "Todo" },
-                    { "id": "doing", "title": "Work in progress" },
-                    { "id": "done", "title": "Done" }
-                  ],
-                  "tasks": [
-                    { "id": "1", "columnId": "todo", "content": "Example task 1" },
-                    { "id": "2", "columnId": "todo", "content": "Example task 2" },
-                    { "id": "3", "columnId": "doing", "content": "Example task 3" },
-                    { "id": "4", "columnId": "doing", "content": "Example task 4" },
-                    { "id": "5", "columnId": "done", "content": "Example task 5" }
-                  ]
-                }
-                            
-                `;
+      const prompt = `Based on this medical analysis: "${cleanedAnalysis}"
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
-    const parsedResponse = JSON.parse(text);
+Create a structured treatment plan with tasks categorized into the following stages. Return ONLY a JSON object in this exact format:
 
-    console.log(text);
-    console.log(parsedResponse);
-    const updatedRecord = await updateRecord({
-      documentID: state.id,
-      kanbanRecords: text,
-    });
-    console.log(updatedRecord);
-    navigate("/screening-schedules", { state: parsedResponse });
-    setIsProcessing(false);
+{
+  "columns": [
+    { "id": "todo", "title": "Todo" },
+    { "id": "doing", "title": "Work in progress" },
+    { "id": "done", "title": "Done" }
+  ],
+  "tasks": [
+    { "id": "1", "columnId": "todo", "content": "Task description" }
+  ]
+}
+
+Ensure each task is specific, actionable, and relevant to the medical treatment plan. Do not include any additional text or explanation, only the JSON object.`;
+
+      console.log("Sending request to Gemini...");
+      const result = await model.generateContent(prompt);
+      console.log("Received response from Gemini");
+      
+      const response = await result.response;
+      const text = response.text();
+      console.log("Raw response:", text);
+
+      // Validate and clean the JSON response
+      let parsedResponse;
+      try {
+        // Remove any potential markdown code block markers
+        const cleanJson = text.replace(/\`\`\`json|\`\`\`|\`/g, '').trim();
+        parsedResponse = JSON.parse(cleanJson);
+        
+        // Validate the structure
+        if (!parsedResponse.columns || !parsedResponse.tasks || 
+            !Array.isArray(parsedResponse.columns) || !Array.isArray(parsedResponse.tasks)) {
+          throw new Error('Invalid response structure');
+        }
+      } catch (error) {
+        console.error('Failed to parse Gemini response:', error);
+        throw new Error('Failed to generate valid treatment plan structure');
+      }
+
+      console.log("Parsed response:", parsedResponse);
+      
+      // Update the record with the new kanban data
+      const updatedRecord = await updateRecord({
+        documentID: state.id,
+        kanbanRecords: JSON.stringify(parsedResponse),
+      });
+
+      if (updatedRecord) {
+        console.log("Record updated successfully");
+        // Navigate with the parsed kanban data
+        navigate("/screening-schedules", { state: parsedResponse });
+      } else {
+        throw new Error("Failed to update record");
+      }
+    } catch (error) {
+      console.error("Error in processTreatmentPlan:", error);
+      alert("Error processing treatment plan: " + error.message);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -182,13 +246,15 @@ function SingleRecordDetails() {
                     A tailored medical strategy leveraging advanced AI insights.
                   </p>
                 </div>
-                <div className="flex w-full flex-col px-6 py-4 text-white">
+                <div className="flex w-full flex-col px-6 py-4 text-gray-800 dark:text-white">
                   <div>
                     <h2 className="text-lg font-semibold text-gray-800 dark:text-white">
                       Analysis Result
                     </h2>
-                    <div className="space-y-2">
-                      <ReactMarkdown>{analysisResult}</ReactMarkdown>
+                    <div className="space-y-2 text-gray-800 dark:text-white">
+                      <ReactMarkdown className="prose prose-gray dark:prose-invert max-w-none">
+                        {analysisResult}
+                      </ReactMarkdown>
                     </div>
                   </div>
                   <div className="mt-5 grid gap-2 sm:flex">

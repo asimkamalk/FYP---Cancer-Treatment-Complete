@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { IconCirclePlus } from "@tabler/icons-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { usePrivy } from "@privy-io/react-auth";
 import { useStateContext } from "../../context/index";
 import CreateRecordModal from "./components/create-record-modal"; // Adjust the import path
@@ -8,6 +8,7 @@ import RecordCard from "./components/record-card"; // Adjust the import path
 
 const Index = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = usePrivy();
   const {
     records,
@@ -27,9 +28,16 @@ const Index = () => {
   }, [user, fetchUserByEmail, fetchUserRecords]);
 
   useEffect(() => {
-    setUserRecords(records);
-    localStorage.setItem("userRecords", JSON.stringify(records));
-  }, [records]);
+    if (location.state?.searchTerm) {
+      const searchTerm = location.state.searchTerm.toLowerCase();
+      const filteredRecords = records.filter(record => 
+        record.recordName.toLowerCase().includes(searchTerm)
+      );
+      setUserRecords(filteredRecords);
+    } else {
+      setUserRecords(records);
+    }
+  }, [records, location.state]);
 
   const handleOpenModal = () => {
     setIsModalOpen(true);

@@ -9,7 +9,3 @@
   from = "/*"
   to = "/index.html"
   status = 200 
-
-VITE_GEMINI_API_KEY=AIzaSyD06uZMczuVMJK5uToyZexYfrFJ72kbsu8
-VITE_DATABASE_URL=postgresql://beat_cancer_owner:npg_DXE7GrRyc0Ln@ep-purple-forest-a4zjsekq.us-east-1.aws.neon.tech/beat_cancer?sslmode=require
-VITE_PRIVY_APP_ID=cm3sxh57k00tzo0ro886sz58q 
